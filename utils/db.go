@@ -62,7 +62,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content text unicode NOT NULL, thumb_src varchar(32) NOT NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(created_at))")
+		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content text unicode NOT NULL, thumb_src varchar(64) NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(created_at))")
 		if err != nil {
 			return err
 		}
@@ -75,6 +75,18 @@ func initDB() error {
 	}
 	if !rows.Next() {
 		_, err = db.Exec("create table comments (id varchar(20) NOT NULL PRIMARY KEY, content text unicode NOT NULL, user_id varchar(32) NOT NULL, post_id varchar(20) NOT NULL, created_at timestamp NOT NULL, is_deleted boolean NOT NULL, index(created_at))")
+		if err != nil {
+			return err
+		}
+	}
+	rows.Close()
+
+	rows, err = db.Query("show tables like 'profiles'")
+	if err != nil {
+		return err
+	}
+	if !rows.Next() {
+		_, err = db.Exec("create table profiles (id varchar(32) NOT NULL PRIMARY KEY, twitter_id varchar(32) NULL, github_id varchar(64) NULL, icon_src varchar(64) NULL)")
 		if err != nil {
 			return err
 		}
@@ -102,6 +114,9 @@ type User struct {
 	Auth       string   `json:"auth" form:"auth"`
 	Posts      []Post   `json:"posts" form:"posts"`
 	ProjectIDs []string `json:"projectIds" form:"projectIds"`
+	IconSrc    string   `json:"iconSrc" form:"iconSrc"`
+	TwitterId  string   `json:"twitterId" form:"twitterId"`
+	GithubId   string   `json:"githubId" form:"githubId"`
 }
 
 func GetUsers() ([]User, error) {
@@ -117,9 +132,14 @@ func GetUsers() ([]User, error) {
 	postMap := map[string][]Post{}
 	for rows.Next() {
 		var p Post
-		rows.Scan(&p.ID, &p.Title, &p.Content, &p.ThumbSrc, &p.UserID, &p.CreatedAt, &p.UpdatedAt, &p.ProjectID, &p.Views)
+		var thumbSrc sql.NullString
+		rows.Scan(&p.ID, &p.Title, &p.Content, &thumbSrc, &p.UserID, &p.CreatedAt, &p.UpdatedAt, &p.ProjectID, &p.Views)
 		if postMap[p.UserID] == nil {
 			postMap[p.UserID] = make([]Post, 0)
+		}
+		p.ThumbSrc = ""
+		if thumbSrc.Valid {
+			p.ThumbSrc = thumbSrc.String
 		}
 		postMap[p.UserID] = append(postMap[p.UserID], p)
 	}
@@ -141,7 +161,7 @@ func GetUsers() ([]User, error) {
 	}
 	rows.Close()
 
-	rows, err = db.Query("select name, id, auth from users where auth = 'default' order by id desc")
+	rows, err = db.Query("select name, users.id, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where auth = 'default' order by id desc")
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +169,8 @@ func GetUsers() ([]User, error) {
 	users := make([]User, 0)
 	for rows.Next() {
 		var u User
-		rows.Scan(&u.Name, &u.ID, &u.Auth)
+		var iconSrc, twitterId, githubId sql.NullString
+		rows.Scan(&u.Name, &u.ID, &u.Auth, &iconSrc, &twitterId, &githubId)
 		if postMap[u.ID] == nil {
 			u.Posts = make([]Post, 0)
 		} else {
@@ -160,6 +181,18 @@ func GetUsers() ([]User, error) {
 		} else {
 			u.ProjectIDs = memberMap[u.ID]
 		}
+		u.IconSrc = ""
+		if iconSrc.Valid {
+			u.IconSrc = iconSrc.String
+		}
+		u.TwitterId = ""
+		if twitterId.Valid {
+			u.TwitterId = twitterId.String
+		}
+		u.GithubId = ""
+		if githubId.Valid {
+			u.GithubId = githubId.String
+		}
 		users = append(users, u)
 	}
 	rows.Close()
@@ -168,7 +201,7 @@ func GetUsers() ([]User, error) {
 }
 
 func GetUser(ID string) (User, error) {
-	rows, err := db.Query("select name, id, auth from users where id = ? and auth = 'default'", ID)
+	rows, err := db.Query("select name, users.id, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where users.id = ? and auth = 'default'", ID)
 	if err != nil {
 		return User{}, err
 	}
@@ -176,8 +209,22 @@ func GetUser(ID string) (User, error) {
 		return User{}, errors.New("user not found")
 	}
 	var user User
-	rows.Scan(&user.Name, &user.ID, &user.Auth)
+	var iconSrc, twitterId, githubId sql.NullString
+	rows.Scan(&user.Name, &user.ID, &user.Auth, &iconSrc, &twitterId, &githubId)
 	rows.Close()
+
+	user.IconSrc = ""
+	if iconSrc.Valid {
+		user.IconSrc = iconSrc.String
+	}
+	user.TwitterId = ""
+	if twitterId.Valid {
+		user.TwitterId = twitterId.String
+	}
+	user.GithubId = ""
+	if githubId.Valid {
+		user.GithubId = githubId.String
+	}
 
 	rows, err = db.Query("select id, title, content, thumb_src, user_id, created_at, updated_at, project_id, views from posts where user_id = ? order by created_at desc", user.ID)
 	if err != nil {
@@ -186,7 +233,12 @@ func GetUser(ID string) (User, error) {
 	user.Posts = make([]Post, 0)
 	for rows.Next() {
 		var post Post
-		rows.Scan(&post.ID, &post.Title, &post.Content, &post.ThumbSrc, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views)
+		var thumbSrc sql.NullString
+		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views)
+		post.ThumbSrc = ""
+		if thumbSrc.Valid {
+			post.ThumbSrc = thumbSrc.String
+		}
 		user.Posts = append(user.Posts, post)
 	}
 	return user, nil
@@ -271,7 +323,12 @@ func GetProjectPosts(projectID string, offset, limit int) ([]Post, error) {
 	posts := make([]Post, 0)
 	for rows.Next() {
 		var post Post
-		rows.Scan(&post.ID, &post.Title, &post.Content, &post.ThumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.Views)
+		var thumbSrc sql.NullString
+		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.Views)
+		post.ThumbSrc = ""
+		if thumbSrc.Valid {
+			post.ThumbSrc = thumbSrc.String
+		}
 		posts = append(posts, post)
 	}
 	rows.Close()
@@ -287,7 +344,12 @@ func GetPost(postID string) (Post, error) {
 		return Post{}, errors.New("post not found")
 	}
 	var post Post
-	rows.Scan(&post.ID, &post.Title, &post.Content, &post.ThumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views)
+	var thumbSrc sql.NullString
+	rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views)
+	post.ThumbSrc = ""
+	if thumbSrc.Valid {
+		post.ThumbSrc = thumbSrc.String
+	}
 	return post, nil
 }
 

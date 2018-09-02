@@ -38,7 +38,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, user_id varchar(32) NOT NULL)")
+		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, user_id varchar(32) NOT NULL, description text NULL)")
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table profiles (id varchar(32) NOT NULL PRIMARY KEY, twitter_id varchar(32) NULL, github_id varchar(64) NULL, icon_src varchar(64) NULL)")
+		_, err = db.Exec("create table profiles (id varchar(32) NOT NULL PRIMARY KEY, description text NULL, twitter_id varchar(32) NULL, github_id varchar(64) NULL, icon_src varchar(64) NULL)")
 		if err != nil {
 			return err
 		}
@@ -109,14 +109,15 @@ type Post struct {
 }
 
 type User struct {
-	ID         string   `json:"id" form:"id"`
-	Name       string   `json:"name" form:"name"`
-	Auth       string   `json:"auth" form:"auth"`
-	Posts      []Post   `json:"posts" form:"posts"`
-	ProjectIDs []string `json:"projectIds" form:"projectIds"`
-	IconSrc    string   `json:"iconSrc" form:"iconSrc"`
-	TwitterId  string   `json:"twitterId" form:"twitterId"`
-	GithubId   string   `json:"githubId" form:"githubId"`
+	ID          string   `json:"id" form:"id"`
+	Name        string   `json:"name" form:"name"`
+	Auth        string   `json:"auth" form:"auth"`
+	Posts       []Post   `json:"posts" form:"posts"`
+	ProjectIDs  []string `json:"projectIds" form:"projectIds"`
+	Description string   `json:"description" form:"description`
+	IconSrc     string   `json:"iconSrc" form:"iconSrc"`
+	TwitterId   string   `json:"twitterId" form:"twitterId"`
+	GithubId    string   `json:"githubId" form:"githubId"`
 }
 
 func GetUsers() ([]User, error) {
@@ -161,7 +162,7 @@ func GetUsers() ([]User, error) {
 	}
 	rows.Close()
 
-	rows, err = db.Query("select name, users.id, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where auth = 'default' order by id desc")
+	rows, err = db.Query("select name, users.id, description, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where auth = 'default' order by id desc")
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +170,8 @@ func GetUsers() ([]User, error) {
 	users := make([]User, 0)
 	for rows.Next() {
 		var u User
-		var iconSrc, twitterId, githubId sql.NullString
-		rows.Scan(&u.Name, &u.ID, &u.Auth, &iconSrc, &twitterId, &githubId)
+		var description, iconSrc, twitterId, githubId sql.NullString
+		rows.Scan(&u.Name, &u.ID, &description, &u.Auth, &iconSrc, &twitterId, &githubId)
 		if postMap[u.ID] == nil {
 			u.Posts = make([]Post, 0)
 		} else {
@@ -180,6 +181,10 @@ func GetUsers() ([]User, error) {
 			u.ProjectIDs = make([]string, 0)
 		} else {
 			u.ProjectIDs = memberMap[u.ID]
+		}
+		u.Description = ""
+		if description.Valid {
+			u.Description = description.String
 		}
 		u.IconSrc = ""
 		if iconSrc.Valid {
@@ -201,7 +206,7 @@ func GetUsers() ([]User, error) {
 }
 
 func GetUser(ID string) (User, error) {
-	rows, err := db.Query("select name, users.id, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where users.id = ? and auth = 'default'", ID)
+	rows, err := db.Query("select name, users.id, description, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where users.id = ? and auth = 'default'", ID)
 	if err != nil {
 		return User{}, err
 	}
@@ -209,10 +214,14 @@ func GetUser(ID string) (User, error) {
 		return User{}, errors.New("user not found")
 	}
 	var user User
-	var iconSrc, twitterId, githubId sql.NullString
-	rows.Scan(&user.Name, &user.ID, &user.Auth, &iconSrc, &twitterId, &githubId)
+	var description, iconSrc, twitterId, githubId sql.NullString
+	rows.Scan(&user.Name, &user.ID, &description, &user.Auth, &iconSrc, &twitterId, &githubId)
 	rows.Close()
 
+	user.Description = ""
+	if description.Valid {
+		user.Description = description.String
+	}
 	user.IconSrc = ""
 	if iconSrc.Valid {
 		user.IconSrc = iconSrc.String
@@ -245,10 +254,11 @@ func GetUser(ID string) (User, error) {
 }
 
 type Project struct {
-	ID     string   `json:"id" form:"id"`
-	Name   string   `json:"name" form:"name"`
-	UserID string   `json:"userId" form:"userId"`
-	Member []string `json:"member" form:"member"`
+	ID          string   `json:"id" form:"id"`
+	Name        string   `json:"name" form:"name"`
+	UserID      string   `json:"userId" form:"userId"`
+	Member      []string `json:"member" form:"member"`
+	Description string   `json:"description" form:"description"`
 }
 
 func GetProjects() ([]Project, error) {
@@ -267,14 +277,19 @@ func GetProjects() ([]Project, error) {
 	}
 	rows.Close()
 
-	rows, err = db.Query("select id, name, user_id from projects")
+	rows, err = db.Query("select id, name, user_id, description from projects")
 	if err != nil {
 		return nil, err
 	}
 	projects := make([]Project, 0)
 	for rows.Next() {
 		var project Project
-		rows.Scan(&project.ID, &project.Name, &project.UserID)
+		var description sql.NullString
+		rows.Scan(&project.ID, &project.Name, &project.UserID, &description)
+		project.Description = ""
+		if description.Valid {
+			project.Description = description.String
+		}
 		if userMap[project.ID] == nil {
 			project.Member = make([]string, 0)
 		} else {
@@ -286,7 +301,7 @@ func GetProjects() ([]Project, error) {
 }
 
 func GetProject(ID string) (Project, error) {
-	rows, err := db.Query("select id, name, user_id from projects where id = ?", ID)
+	rows, err := db.Query("select id, name, user_id, description from projects where id = ?", ID)
 	if err != nil {
 		return Project{}, err
 	}
@@ -295,7 +310,12 @@ func GetProject(ID string) (Project, error) {
 		return Project{}, errors.New("project not found")
 	}
 	var project Project
-	rows.Scan(&project.ID, &project.Name, &project.UserID)
+	var description sql.NullString
+	rows.Scan(&project.ID, &project.Name, &project.UserID, &description)
+	project.Description = ""
+	if description.Valid {
+		project.Description = description.String
+	}
 	rows.Close()
 
 	rows, err = db.Query("select user_id from member where project_id = ?", project.ID)
@@ -386,4 +406,69 @@ func GetComment(commentID string) (Comment, error) {
 	var comment Comment
 	rows.Scan(&comment.ID, &comment.Content, &comment.UserID, &comment.PostID, &comment.CreatedAt)
 	return comment, nil
+}
+
+func HasAuth(ID string) bool {
+	rows, err := db.Query("select auth from users where id = ?", ID)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return false
+	}
+	var auth string
+	rows.Scan(&auth)
+	if auth == "default" {
+		go checkProfile(ID)
+		return true
+	} else {
+		return false
+	}
+}
+
+func HasCommentAuth(ID string) bool {
+	rows, err := db.Query("select id from users where id = ?", ID)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	return rows.Next()
+}
+
+func (post *Post) Insert() error {
+	_, err := db.Exec("insert into posts (id, title, content, thumb_src, user_id, created_at, updated_at, project_id, views, is_deleted) value(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", post.ID, post.Title, post.Content, post.ThumbSrc, post.UserID, post.CreatedAt, post.UpdatedAt, post.ProjectID, post.Views, false)
+	return err
+}
+
+func (project *Project) Insert() error {
+	_, err := db.Exec("insert into projects (id, name, user_id, description) value(?, ?, ?, ?)", project.ID, project.Name, project.UserID, project.Description)
+	if err != nil {
+		return err
+	}
+	for userID := range project.Member {
+		_, err = db.Exec("insert into member (user_id, project_id) value(?, ?)", userID, project.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (comment *Comment) Insert() error {
+	_, err := db.Exec("insert into comments (id, content, user_id, post_id, created_at, is_deleted) value(?, ?, ?, ?, ?, ?)", comment.ID, comment.Content, comment.UserID, comment.PostID, comment.CreatedAt, false)
+	return err
+}
+
+func checkProfile(ID string) {
+	rows, err := db.Query("select id from profiles where id = ?", ID)
+	if err != nil {
+		return
+	}
+	if !rows.Next() {
+		rows.Close()
+		db.Query("insert into profiles (id) value(?)", ID)
+		return
+	}
+	rows.Close()
 }

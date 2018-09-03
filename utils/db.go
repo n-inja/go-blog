@@ -38,7 +38,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, user_id varchar(32) NOT NULL, description text NULL)")
+		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, user_id varchar(32) NOT NULL, description text NULL, foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table member (user_id varchar(32) NOT NULL, project_id varchar(20) NOT NULL, PRIMARY KEY(user_id, project_id))")
+		_, err = db.Exec("create table member (user_id varchar(32) NOT NULL, project_id varchar(20) NOT NULL, PRIMARY KEY(user_id, project_id), foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content text unicode NOT NULL, thumb_src varchar(64) NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(created_at))")
+		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content text unicode NOT NULL, thumb_src varchar(64) NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(created_at), index(is_deleted), index(project_id), foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -74,7 +74,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table comments (id varchar(20) NOT NULL PRIMARY KEY, content text unicode NOT NULL, user_id varchar(32) NOT NULL, post_id varchar(20) NOT NULL, created_at timestamp NOT NULL, is_deleted boolean NOT NULL, index(created_at))")
+		_, err = db.Exec("create table comments (id varchar(20) NOT NULL PRIMARY KEY, content text unicode NOT NULL, user_id varchar(32) NOT NULL, post_id varchar(20) NOT NULL, created_at timestamp NOT NULL, is_deleted boolean NOT NULL, index(created_at), index(is_deleted), index(post_id), foreign key(post_id) references posts(id), foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table profiles (id varchar(32) NOT NULL PRIMARY KEY, description text NULL, twitter_id varchar(32) NULL, github_id varchar(64) NULL, icon_src varchar(64) NULL)")
+		_, err = db.Exec("create table profiles (id varchar(32) NOT NULL PRIMARY KEY, description text NULL, twitter_id varchar(32) NULL, github_id varchar(64) NULL, icon_src varchar(64) NULL, foreign key(id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ type User struct {
 	Auth        string   `json:"auth" form:"auth"`
 	Posts       []Post   `json:"posts" form:"posts"`
 	ProjectIDs  []string `json:"projectIds" form:"projectIds"`
-	Description string   `json:"description" form:"description`
+	Description string   `json:"description" form:"description"`
 	IconSrc     string   `json:"iconSrc" form:"iconSrc"`
 	TwitterId   string   `json:"twitterId" form:"twitterId"`
 	GithubId    string   `json:"githubId" form:"githubId"`
@@ -295,6 +295,7 @@ func GetProjects() ([]Project, error) {
 		} else {
 			project.Member = userMap[project.ID]
 		}
+		projects = append(projects, project)
 	}
 	rows.Close()
 	return projects, nil
@@ -344,7 +345,7 @@ func GetProjectPosts(projectID string, offset, limit int) ([]Post, error) {
 	for rows.Next() {
 		var post Post
 		var thumbSrc sql.NullString
-		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.Views)
+		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views)
 		post.ThumbSrc = ""
 		if thumbSrc.Valid {
 			post.ThumbSrc = thumbSrc.String
@@ -446,7 +447,7 @@ func (project *Project) Insert() error {
 	if err != nil {
 		return err
 	}
-	for userID := range project.Member {
+	for _, userID := range project.Member {
 		_, err = db.Exec("insert into member (user_id, project_id) value(?, ?)", userID, project.ID)
 		if err != nil {
 			return err
@@ -471,4 +472,56 @@ func checkProfile(ID string) {
 		return
 	}
 	rows.Close()
+}
+
+func (project *Project) Delete() error {
+	_, err := db.Exec("delete from projects where id = ?", project.ID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("update posts set is_deleted = true where project_id = ?", project.ID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("delete from member where project_id = ?", project.ID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("update comments set is_deleted = true where post_id in (select id from posts where project_id = ?)", project.ID)
+	return err
+}
+
+func (post *Post) Delete() error {
+	_, err := db.Exec("update posts set is_deleted = true where id = ?", post.ID)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("update comments set is_deleted = true where post_id = ?", post.ID)
+	return err
+}
+
+func (comment *Comment) Delete() error {
+	_, err := db.Exec("update comments set is_deleted = true where id = ?", comment.ID)
+	return err
+}
+
+func (project *Project) Update(invites, removes []string) error {
+	_, err := db.Exec("update projects set name = ?, user_id = ?, description = ? where id = ?", project.Name, project.UserID, project.Description, project.ID)
+	for _, userID := range invites {
+		db.Exec("insert into member (user_id, project_id) value(?, ?)", userID, project.ID)
+	}
+	for _, userID := range removes {
+		db.Exec("delete from member where user_id = ? and project_id = ?", userID, project.ID)
+	}
+	return err
+}
+
+func (post *Post) Update() error {
+	_, err := db.Exec("update posts set title = ?, content = ?, thumb_src = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.ID)
+	return err
+}
+
+func (user *User) Update() error {
+	_, err := db.Exec("update profiles set description = ?, twitter_id = ?, github_id = ?, icon_src = ? where id = ?", user.Description, user.TwitterId, user.GithubId, user.IconSrc, user.ID)
+	return err
 }

@@ -40,6 +40,14 @@ func main() {
 	router.POST("go-blog/api/v1/projects", postProject)
 	router.POST("go-blog/api/v1/posts/:postID/comments", postComment)
 
+	router.DELETE("go-blog/api/v1/projects/:projectID", deleteProject)
+	router.DELETE("go-blog/api/v1/posts/:postID", deletePost)
+	router.DELETE("go-blog/api/v1/comments/:commentID", deleteComment)
+
+	router.PUT("go-blog/api/v1/projects/:projectID", updateProject)
+	router.PUT("go-blog/api/v1/posts/:postID", updatePost)
+	router.PUT("go-blog/api/v1/profile", updateProfile)
+
 	router.Run(":" + os.Getenv("GO_BLOG_PORT"))
 }
 
@@ -190,7 +198,7 @@ func postProject(c *gin.Context) {
 	}
 
 	var projectForm projectForm
-	err := c.BindJSON(projectForm)
+	err := c.BindJSON(&projectForm)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{})
 		return
@@ -230,4 +238,225 @@ func postComment(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, comment)
+}
+
+func deleteProject(c *gin.Context) {
+	projectID := c.Param("projectID")
+	ID := c.GetHeader("id")
+	project, err := utils.GetProject(projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	if project.UserID != ID {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+	err = project.Delete()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func deletePost(c *gin.Context) {
+	postID := c.Param("postID")
+	ID := c.GetHeader("id")
+	post, err := utils.GetPost(postID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	project, err := utils.GetProject(post.ProjectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	if ID != project.UserID && ID != post.UserID {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+	err = post.Delete()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+func deleteComment(c *gin.Context) {
+	commentID := c.Param("commentID")
+	ID := c.GetHeader("id")
+	comment, err := utils.GetComment(commentID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	if ID != comment.ID {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+	err = comment.Delete()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
+}
+
+type updateProjectForm struct {
+	NewName        string   `json:"newName" form:"newName"`
+	NewUserID      string   `json:"newUserId" form:"newUserId"`
+	NewDescription string   `json:"newDescription" form:"newDescription"`
+	Invites        []string `json:"invites" form:"invites"`
+	Removes        []string `json:"removes" form:"removes"`
+}
+
+func updateProject(c *gin.Context) {
+	projectID := c.Param("projectID")
+	ID := c.GetHeader("id")
+	project, err := utils.GetProject(projectID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+
+	if project.UserID != ID {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+
+	var body updateProjectForm
+	err = c.BindJSON(&body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+
+	memberMap := make(map[string]bool, 0)
+	for _, userID := range project.Member {
+		memberMap[userID] = true
+	}
+	invites := make([]string, 0)
+	for _, userID := range body.Invites {
+		if !memberMap[userID] {
+			invites = append(invites, userID)
+		}
+	}
+	removes := make([]string, 0)
+	for _, userID := range body.Invites {
+		if memberMap[userID] && userID != project.UserID && userID != body.NewUserID {
+			removes = append(removes, userID)
+		}
+	}
+
+	if body.NewUserID != "" {
+		belong := false
+		for _, userID := range project.Member {
+			if userID == body.NewUserID {
+				belong = true
+			}
+		}
+		if !belong {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"message": "project owner should belong project",
+			})
+			return
+		}
+		project.UserID = body.NewUserID
+	}
+	if body.NewName != "" {
+		project.Name = body.NewName
+	}
+	if body.NewDescription != "" {
+		project.Description = body.NewDescription
+	}
+	err = project.Update(invites, removes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, project)
+}
+
+type UpdatePostForm struct {
+	NewTitle    string `json:"newTitle" form:"newTitle"`
+	NewContent  string `json:"newContent" form:"newContent"`
+	NewThumbSrc string `json:"newThumbSrc" form:"newThumbSrd"`
+}
+
+func updatePost(c *gin.Context) {
+	postID := c.Param("postID")
+	ID := c.Param("id")
+	post, err := utils.GetPost(postID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	if ID != post.UserID {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+	var body UpdatePostForm
+	err = c.BindJSON(&body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+	if body.NewContent != "" {
+		post.Content = body.NewContent
+	}
+	if body.NewTitle != "" {
+		post.Title = body.NewTitle
+	}
+	if body.NewThumbSrc != "" {
+		post.ThumbSrc = body.NewThumbSrc
+	}
+	err = post.Update()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, post)
+}
+
+type UpdateProfileForm struct {
+	NewDescription string `json:"newDescription" form:"newDescription"`
+	NewTwitterID   string `json:"newTwitterId" form:"newTwitterId"`
+	NewGithubID    string `json:"newGithubId" form:"newGithubId"`
+	NewIconSrc     string `json:"newIconSrc" form:"newIconSrc"`
+}
+
+func updateProfile(c *gin.Context) {
+	ID := c.GetHeader("id")
+	user, err := utils.GetUser(ID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{})
+		return
+	}
+	var body UpdateProfileForm
+	err = c.BindJSON(&body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+	if body.NewDescription != "" {
+		user.Description = body.NewDescription
+	}
+	if body.NewGithubID != "" {
+		user.GithubId = body.NewGithubID
+	}
+	if body.NewTwitterID != "" {
+		user.TwitterId = body.NewTwitterID
+	}
+	if body.NewIconSrc != "" {
+		user.IconSrc = body.NewIconSrc
+	}
+	err = user.Update()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }

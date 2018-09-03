@@ -3,11 +3,13 @@ package utils
 import (
 	"database/sql"
 	"errors"
+	"regexp"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
+var regexProjectName *regexp.Regexp
 
 func Open(userName, password, address, databaseName string) error {
 	var err error
@@ -15,6 +17,8 @@ func Open(userName, password, address, databaseName string) error {
 	if err != nil {
 		return err
 	}
+	regexProjectName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 	return initDB()
 }
 
@@ -235,7 +239,7 @@ func GetUser(ID string) (User, error) {
 		user.GithubId = githubId.String
 	}
 
-	rows, err = db.Query("select id, title, content, thumb_src, user_id, created_at, updated_at, project_id, views from posts where user_id = ? order by created_at desc", user.ID)
+	rows, err = db.Query("select id, title, content, thumb_src, user_id, created_at, updated_at, project_id, views from posts where user_id = ? order by created_at desc limit 10", user.ID)
 	if err != nil {
 		return user, err
 	}
@@ -249,6 +253,18 @@ func GetUser(ID string) (User, error) {
 			post.ThumbSrc = thumbSrc.String
 		}
 		user.Posts = append(user.Posts, post)
+	}
+	rows.Close()
+
+	rows, err = db.Query("select project_id from member where user_id = ?", ID)
+	if err != nil {
+		return user, err
+	}
+	user.ProjectIDs = make([]string, 0)
+	for rows.Next() {
+		var projectID string
+		rows.Scan(&projectID)
+		user.ProjectIDs = append(user.ProjectIDs, projectID)
 	}
 	return user, nil
 }
@@ -443,6 +459,9 @@ func (post *Post) Insert() error {
 }
 
 func (project *Project) Insert() error {
+	if !regexProjectName.MatchString(project.Name) {
+		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
+	}
 	_, err := db.Exec("insert into projects (id, name, user_id, description) value(?, ?, ?, ?)", project.ID, project.Name, project.UserID, project.Description)
 	if err != nil {
 		return err
@@ -506,6 +525,9 @@ func (comment *Comment) Delete() error {
 }
 
 func (project *Project) Update(invites, removes []string) error {
+	if !regexProjectName.MatchString(project.Name) {
+		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
+	}
 	_, err := db.Exec("update projects set name = ?, user_id = ?, description = ? where id = ?", project.Name, project.UserID, project.Description, project.ID)
 	for _, userID := range invites {
 		db.Exec("insert into member (user_id, project_id) value(?, ?)", userID, project.ID)

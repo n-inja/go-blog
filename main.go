@@ -29,9 +29,11 @@ func main() {
 	router := gin.Default()
 	router.GET("go-blog/api/v1/users", getAllUsers)
 	router.GET("go-blog/api/v1/users/:userID", getUser)
+	router.GET("go-blog/api/v1/users/:userID/posts", getUserPosts)
 	router.GET("go-blog/api/v1/projects", getProjects)
 	router.GET("go-blog/api/v1/projects/:projectID", getProject)
 	router.GET("go-blog/api/v1/projects/:projectID/posts", getProjectPosts)
+	router.GET("go-blog/api/v1/posts", getPosts)
 	router.GET("go-blog/api/v1/posts/:postID", getPost)
 	router.GET("go-blog/api/v1/posts/:postID/comments", getPostComments)
 	router.GET("go-blog/api/v1/comments/:commentID", getComment)
@@ -70,6 +72,28 @@ func getUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+func getUserPosts(c *gin.Context) {
+	userID := c.Param("userID")
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil {
+		offset = 0
+	}
+	if limit < 0 || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+	posts, err := utils.GetUserPosts(userID, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, posts)
+}
+
 func getProjects(c *gin.Context) {
 	projects, err := utils.GetProjects()
 	if err != nil {
@@ -104,6 +128,27 @@ func getProjectPosts(c *gin.Context) {
 		return
 	}
 	posts, err := utils.GetProjectPosts(projectID, offset, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, posts)
+}
+
+func getPosts(c *gin.Context) {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "3"))
+	if err != nil {
+		limit = 10
+	}
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil {
+		offset = 0
+	}
+	if limit < 0 || offset < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{})
+		return
+	}
+	posts, err := utils.GetPosts(offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{})
 		return
@@ -418,6 +463,7 @@ func updatePost(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{})
 		return
 	}
+	post.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
 	c.JSON(http.StatusOK, post)
 }
 

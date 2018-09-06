@@ -532,7 +532,7 @@ func (project *Project) Update(invites, removes []string) error {
 }
 
 func (post *Post) Update() error {
-	_, err := db.Exec("update posts set title = ?, content = ?, thumb_src = ?, created_at = ?, updated_at = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.ID, post.CreatedAt, post.UpdatedAt)
+	_, err := db.Exec("update posts set title = ?, content = ?, thumb_src = ?, created_at = ?, updated_at = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.CreatedAt, post.UpdatedAt, post.ID)
 	return err
 }
 

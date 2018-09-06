@@ -433,7 +433,7 @@ type UpdatePostForm struct {
 
 func updatePost(c *gin.Context) {
 	postID := c.Param("postID")
-	ID := c.Param("id")
+	ID := c.GetHeader("id")
 	post, err := utils.GetPost(postID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{})

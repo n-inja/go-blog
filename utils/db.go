@@ -17,6 +17,7 @@ func Open(userName, password, address, databaseName string) error {
 	if err != nil {
 		return err
 	}
+	db.SetMaxIdleConns(0)
 	regexProjectName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 	return initDB()

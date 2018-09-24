@@ -67,7 +67,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content text unicode NOT NULL, thumb_src varchar(64) NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(user_id), index(created_at), index(is_deleted), index(project_id), foreign key(user_id) references users(id)) engine=innodb")
+		_, err = db.Exec("create table posts (id varchar(20) NOT NULL PRIMARY KEY, title varchar(32) NOT NULL, content longtext unicode NOT NULL, thumb_src varchar(64) NULL, user_id varchar(32) NOT NULL, created_at timestamp NOT NULL, updated_at timestamp NOT NULL, project_id varchar(20) NOT NULL, views int NOT NULL, is_deleted boolean NOT NULL, index(user_id), index(created_at), index(is_deleted), index(project_id), foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}

@@ -421,31 +421,19 @@ func GetComment(commentID string) (Comment, error) {
 }
 
 func GetProjectPostById(projectID string, postNumber int) (Post, error) {
-	row, err := db.Query("select id from posts where project_id = ? order by created_at asc limit ?, 1", projectID, postNumber)
-	if err != nil {
-		return Post{}, err
-	}
-	if !row.Next() {
-		row.Close()
-		return Post{}, err
-	}
-	row.Close()
-
 	var postID string
-	row.Scan(&postID)
-	row, err = db.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID)
-
+	err := db.QueryRow("select id from posts where project_id = ? order by created_at asc limit ?, 1", projectID, postNumber).Scan(&postID)
 	if err != nil {
-		return Post{}, err
-	}
-	defer row.Close()
-	if !row.Next() {
-		return Post{}, err
+		return Post{}, errors.New("post not found")
 	}
 
 	var post Post
 	var thumbSrc sql.NullString
-	row.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
+	err = db.QueryRow("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID).Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
+	if err != nil {
+		return Post{}, errors.New("db error")
+	}
+
 	post.ThumbSrc = ""
 	if thumbSrc.Valid {
 		post.ThumbSrc = thumbSrc.String

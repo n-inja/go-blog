@@ -250,6 +250,7 @@ type Project struct {
 	UserID      string   `json:"userId" form:"userId"`
 	Member      []string `json:"member" form:"member"`
 	Description string   `json:"description" form:"description"`
+	PostCount   int      `json:"postCount" form:"postCount"`
 }
 
 func GetProjects() ([]Project, error) {
@@ -268,7 +269,7 @@ func GetProjects() ([]Project, error) {
 	}
 	rows.Close()
 
-	rows, err = db.Query("select id, name, display_name, user_id, description from projects")
+	rows, err = db.Query("select projects.id, name, display_name, projects.user_id, description, count(*) from projects left join posts on posts.project_id = projects.id group by projects.id")
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +277,7 @@ func GetProjects() ([]Project, error) {
 	for rows.Next() {
 		var project Project
 		var description sql.NullString
-		rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description)
+		rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description, &project.PostCount)
 		project.Description = ""
 		if description.Valid {
 			project.Description = description.String
@@ -293,7 +294,7 @@ func GetProjects() ([]Project, error) {
 }
 
 func GetProject(ID string) (Project, error) {
-	rows, err := db.Query("select id, name, display_name, user_id, description from projects where id = ?", ID)
+	rows, err := db.Query("select p.id, p.name, p.display_name, p.user_id, p.description, count(*) from (select * from projects where id = ?) p left join posts on p.id = posts.project_id group by p.id", ID)
 	if err != nil {
 		return Project{}, err
 	}
@@ -303,7 +304,7 @@ func GetProject(ID string) (Project, error) {
 	}
 	var project Project
 	var description sql.NullString
-	rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description)
+	rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description, &project.PostCount)
 	project.Description = ""
 	if description.Valid {
 		project.Description = description.String

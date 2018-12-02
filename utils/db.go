@@ -112,6 +112,7 @@ type Post struct {
 	ProjectID  string `json:"projectId" form:"projectId"`
 	Views      int    `json:"views" form:"views"`
 	CommentNum int    `json:"commentNum" form:"commentNum"`
+	Number     int    `json:"number" form:"number"`
 }
 
 type User struct {
@@ -231,6 +232,7 @@ func GetUserPosts(userID string, offset, limit int) ([]Post, error) {
 	posts := make([]Post, 0)
 	for rows.Next() {
 		var post Post
+		post.Number = -1
 		var thumbSrc sql.NullString
 		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
 		post.ThumbSrc = ""
@@ -336,6 +338,7 @@ func GetProjectPosts(projectID string, offset, limit int) ([]Post, error) {
 	posts := make([]Post, 0)
 	for rows.Next() {
 		var post Post
+		post.Number = -1
 		var thumbSrc sql.NullString
 		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
 		post.ThumbSrc = ""
@@ -356,6 +359,7 @@ func GetPosts(offset, limit int) ([]Post, error) {
 	posts := make([]Post, 0)
 	for rows.Next() {
 		var post Post
+		post.Number = -1
 		var thumbSrc sql.NullString
 		rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
 		post.ThumbSrc = ""
@@ -369,19 +373,20 @@ func GetPosts(offset, limit int) ([]Post, error) {
 }
 
 func GetPost(postID string) (Post, error) {
-	rows, err := db.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID)
+	var post Post
+	var thumbSrc sql.NullString
+	err := db.QueryRow("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID).Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
 	if err != nil {
 		return Post{}, err
 	}
-	if !rows.Next() {
-		return Post{}, errors.New("post not found")
-	}
-	var post Post
-	var thumbSrc sql.NullString
-	rows.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
 	post.ThumbSrc = ""
 	if thumbSrc.Valid {
 		post.ThumbSrc = thumbSrc.String
+	}
+
+	err = db.QueryRow("select count(*) from posts where project_id = ? and created_at < ?", post.ProjectID, post.CreatedAt).Scan(&post.Number)
+	if err != nil {
+		return Post{}, err
 	}
 	return post, nil
 }
@@ -439,6 +444,7 @@ func GetProjectPostById(projectID string, postNumber int) (Post, error) {
 	if thumbSrc.Valid {
 		post.ThumbSrc = thumbSrc.String
 	}
+	post.Number = postNumber
 
 	return post, nil
 }

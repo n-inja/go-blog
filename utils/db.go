@@ -43,7 +43,7 @@ func initDB() error {
 		return err
 	}
 	if !rows.Next() {
-		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, user_id varchar(32) NOT NULL, description text unicode NULL, foreign key(user_id) references users(id)) engine=innodb")
+		_, err = db.Exec("create table projects (id varchar(20) NOT NULL PRIMARY KEY, name varchar(32) NOT NULL UNIQUE, display_name varchar(64) unicode NOT NULL, user_id varchar(32) NOT NULL, description text unicode NULL, foreign key(user_id) references users(id)) engine=innodb")
 		if err != nil {
 			return err
 		}
@@ -246,6 +246,7 @@ func GetUserPosts(userID string, offset, limit int) ([]Post, error) {
 type Project struct {
 	ID          string   `json:"id" form:"id"`
 	Name        string   `json:"name" form:"name"`
+	DisplayName string   `json:"displayName" form:"displayName"`
 	UserID      string   `json:"userId" form:"userId"`
 	Member      []string `json:"member" form:"member"`
 	Description string   `json:"description" form:"description"`
@@ -419,6 +420,40 @@ func GetComment(commentID string) (Comment, error) {
 	return comment, nil
 }
 
+func GetProjectPostById(projectID string, postNumber int) (Post, error) {
+	row, err := db.Query("select id from posts where project_id = ? order by created_at asc limit ?, 1", projectID, postNumber)
+	if err != nil {
+		return Post{}, err
+	}
+	if !row.Next() {
+		row.Close()
+		return Post{}, err
+	}
+	row.Close()
+
+	var postID string
+	row.Scan(&postID)
+	row, err = db.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID)
+
+	if err != nil {
+		return Post{}, err
+	}
+	defer row.Close()
+	if !row.Next() {
+		return Post{}, err
+	}
+
+	var post Post
+	var thumbSrc sql.NullString
+	row.Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
+	post.ThumbSrc = ""
+	if thumbSrc.Valid {
+		post.ThumbSrc = thumbSrc.String
+	}
+
+	return post, nil
+}
+
 func HasAuth(ID string) bool {
 	rows, err := db.Query("select auth from users where id = ?", ID)
 	if err != nil {
@@ -456,7 +491,7 @@ func (project *Project) Insert() error {
 	if !regexProjectName.MatchString(project.Name) {
 		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
 	}
-	_, err := db.Exec("insert into projects (id, name, user_id, description) value(?, ?, ?, ?)", project.ID, project.Name, project.UserID, project.Description)
+	_, err := db.Exec("insert into projects (id, name, display_name, user_id, description) value(?, ?, ?, ?, ?)", project.ID, project.Name, project.DisplayName, project.UserID, project.Description)
 	if err != nil {
 		return err
 	}
@@ -522,7 +557,7 @@ func (project *Project) Update(invites, removes []string) error {
 	if !regexProjectName.MatchString(project.Name) {
 		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
 	}
-	_, err := db.Exec("update projects set name = ?, user_id = ?, description = ? where id = ?", project.Name, project.UserID, project.Description, project.ID)
+	_, err := db.Exec("update projects set name = ?, display_name = ?, user_id = ?, description = ? where id = ?", project.Name, project.DisplayName, project.UserID, project.Description, project.ID)
 	for _, userID := range invites {
 		db.Exec("insert into member (user_id, project_id) value(?, ?)", userID, project.ID)
 	}

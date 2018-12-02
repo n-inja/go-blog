@@ -37,6 +37,7 @@ func main() {
 	router.GET("go-blog/api/v1/posts/:postID", getPost)
 	router.GET("go-blog/api/v1/posts/:postID/comments", getPostComments)
 	router.GET("go-blog/api/v1/comments/:commentID", getComment)
+	router.GET("go-blog/api/v1/projects/:projectID/post", getProjectPostById)
 
 	router.POST("go-blog/api/v1/projects/:projectID/posts", postPost)
 	router.POST("go-blog/api/v1/projects", postProject)
@@ -199,6 +200,22 @@ func getComment(c *gin.Context) {
 	c.JSON(http.StatusOK, comment)
 }
 
+func getProjectPostById(c *gin.Context) {
+	projectID := c.Param("projectID")
+	postNumber, err := strconv.Atoi(c.DefaultQuery("id", "0"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "id should be number"})
+		return
+	}
+
+	post, err := utils.GetProjectPostById(projectID, postNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, post)
+}
+
 type PostForm struct {
 	Title    string `json:"title" form:"title" binding:"required"`
 	Content  string `json:"content" form:"content" binding:"required"`
@@ -352,6 +369,7 @@ func deleteComment(c *gin.Context) {
 
 type updateProjectForm struct {
 	NewName        string   `json:"newName" form:"newName"`
+	NewDisplayName string   `json:"newDisplayName" form:"newDisplayName"`
 	NewUserID      string   `json:"newUserId" form:"newUserId"`
 	NewDescription string   `json:"newDescription" form:"newDescription"`
 	Invites        []string `json:"invites" form:"invites"`

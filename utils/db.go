@@ -268,7 +268,7 @@ func GetProjects() ([]Project, error) {
 	}
 	rows.Close()
 
-	rows, err = db.Query("select id, name, user_id, description from projects")
+	rows, err = db.Query("select id, name, display_name, user_id, description from projects")
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func GetProjects() ([]Project, error) {
 	for rows.Next() {
 		var project Project
 		var description sql.NullString
-		rows.Scan(&project.ID, &project.Name, &project.UserID, &description)
+		rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description)
 		project.Description = ""
 		if description.Valid {
 			project.Description = description.String
@@ -293,7 +293,7 @@ func GetProjects() ([]Project, error) {
 }
 
 func GetProject(ID string) (Project, error) {
-	rows, err := db.Query("select id, name, user_id, description from projects where id = ?", ID)
+	rows, err := db.Query("select id, name, display_name, user_id, description from projects where id = ?", ID)
 	if err != nil {
 		return Project{}, err
 	}
@@ -303,7 +303,7 @@ func GetProject(ID string) (Project, error) {
 	}
 	var project Project
 	var description sql.NullString
-	rows.Scan(&project.ID, &project.Name, &project.UserID, &description)
+	rows.Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description)
 	project.Description = ""
 	if description.Valid {
 		project.Description = description.String

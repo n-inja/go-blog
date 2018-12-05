@@ -3,15 +3,24 @@ package utils
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"regexp"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var DB *sql.DB
+var DB *sql.DB = nil
 var RegexProjectName *regexp.Regexp
 
-func Open(userName, password, address, databaseName string) error {
+func open() error {
+	address := ""
+	if os.Getenv("DATABASE_ADDRESS") != "" {
+		address = os.Getenv("DATABASE_ADDRESS")
+	}
+	userName := os.Getenv("DATABASE_USERNAME")
+	password := os.Getenv("DATABASE_PASSWORD")
+	databaseName := os.Getenv("DATABASE_NAME")
+
 	var err error
 	DB, err = sql.Open("mysql", userName+":"+password+"@"+address+"/"+databaseName)
 	if err != nil {
@@ -21,6 +30,26 @@ func Open(userName, password, address, databaseName string) error {
 	RegexProjectName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 	return initDB()
+}
+
+func Init() error {
+	if DB == nil {
+		err := open()
+		if err != nil {
+			return err
+		}
+	}
+	return initDB()
+}
+
+func Open() error {
+	if DB == nil {
+		err := open()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func Close() {
@@ -102,6 +131,10 @@ func initDB() error {
 }
 
 func Transact(txFunc func(*sql.Tx) error) (err error) {
+	if DB == nil {
+		open()
+	}
+
 	tx, err := DB.Begin()
 	if err != nil {
 		return
@@ -121,6 +154,10 @@ func Transact(txFunc func(*sql.Tx) error) (err error) {
 }
 
 func HasAuth(ID string) bool {
+	if DB == nil {
+		open()
+	}
+
 	var auth string
 	err := DB.QueryRow("select auth from users where id = ?", ID).Scan(&auth)
 	if err != nil {
@@ -135,6 +172,10 @@ func HasAuth(ID string) bool {
 }
 
 func HasCommentAuth(ID string) bool {
+	if DB == nil {
+		open()
+	}
+
 	rows, err := DB.Query("select id from users where id = ?", ID)
 	if err != nil {
 		return false
@@ -144,6 +185,10 @@ func HasCommentAuth(ID string) bool {
 }
 
 func checkProfile(ID string) {
+	if DB == nil {
+		open()
+	}
+
 	rows, err := DB.Query("select id from profiles where id = ?", ID)
 	if err != nil {
 		return

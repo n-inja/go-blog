@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/n-inja/blog/model"
-	"github.com/n-inja/blog/utils"
+	"github.com/n-inja/go-blog/model"
+	"github.com/n-inja/go-blog/utils"
 	"github.com/rs/xid"
 )
 

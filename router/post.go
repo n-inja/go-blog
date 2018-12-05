@@ -1,13 +1,14 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/n-inja/blog/model"
-	"github.com/n-inja/blog/utils"
+	"github.com/n-inja/go-blog/model"
+	"github.com/n-inja/go-blog/utils"
 	"github.com/rs/xid"
 )
 
@@ -127,6 +128,7 @@ func PostPost(c *gin.Context) {
 	post := model.Post{ID: xid.New().String(), Title: postForm.Title, Content: postForm.Content, ThumbSrc: postForm.ThumbSrc, UserID: ID, CreatedAt: date.Format("2006-01-02 15:04:05"), UpdatedAt: date.Format("2006-01-02 15:04:05"), ProjectID: projectID, Views: 0}
 	err = post.Insert()
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{})
 		return
 	}

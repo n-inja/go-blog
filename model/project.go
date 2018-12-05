@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/n-inja/blog/utils"
+	"github.com/n-inja/go-blog/utils"
 )
 
 type Project struct {
@@ -18,6 +18,8 @@ type Project struct {
 }
 
 func (project *Project) Insert() error {
+	utils.Open()
+
 	if !utils.RegexProjectName.MatchString(project.Name) {
 		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
 	}
@@ -37,6 +39,8 @@ func (project *Project) Insert() error {
 }
 
 func (project *Project) Delete() error {
+	utils.Open()
+
 	_, err := utils.DB.Exec("delete from projects where id = ?", project.ID)
 	if err != nil {
 		return err
@@ -54,6 +58,8 @@ func (project *Project) Delete() error {
 }
 
 func (project *Project) Update(invites, removes []string) error {
+	utils.Open()
+
 	if !utils.RegexProjectName.MatchString(project.Name) {
 		return errors.New("project name := ^[a-zA-Z0-9_-]+$")
 	}
@@ -79,6 +85,8 @@ func (project *Project) Update(invites, removes []string) error {
 }
 
 func GetProjects() ([]Project, error) {
+	utils.Open()
+
 	memberRows, err := utils.DB.Query("select project_id, user_id from member")
 	if err != nil {
 		return nil, err
@@ -119,6 +127,8 @@ func GetProjects() ([]Project, error) {
 }
 
 func GetProject(ID string) (Project, error) {
+	utils.Open()
+
 	var project Project
 	var description sql.NullString
 	err := utils.DB.QueryRow("select p.id, p.name, p.display_name, p.user_id, p.description, count(*) from (select * from projects where id = ?) p left join posts on p.id = posts.project_id group by p.id", ID).Scan(&project.ID, &project.Name, &project.DisplayName, &project.UserID, &description, &project.PostCount)

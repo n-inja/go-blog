@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/n-inja/blog/utils"
+	"github.com/n-inja/go-blog/utils"
 )
 
 type User struct {
@@ -19,11 +19,15 @@ type User struct {
 }
 
 func (user *User) Update() error {
+	utils.Open()
+
 	_, err := utils.DB.Exec("update profiles set description = ?, twitter_id = ?, github_id = ?, icon_src = ? where id = ?", user.Description, user.TwitterId, user.GithubId, user.IconSrc, user.ID)
 	return err
 }
 
 func GetUsers() ([]User, error) {
+	utils.Open()
+
 	rows, err := utils.DB.Query("select user_id, project_id from member")
 	if err != nil {
 		return nil, err
@@ -79,6 +83,8 @@ func GetUsers() ([]User, error) {
 }
 
 func GetUser(ID string) (User, error) {
+	utils.Open()
+
 	rows, err := utils.DB.Query("select name, users.id, description, auth, icon_src, twitter_id, github_id from users left join profiles on users.id = profiles.id where users.id = ? and auth = 'default'", ID)
 	if err != nil {
 		return User{}, err

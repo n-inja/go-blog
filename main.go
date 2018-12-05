@@ -5,23 +5,19 @@ import (
 	"os"
 
 	"./utils"
-	"github.com/n-inja/blog/router"
+	"github.com/n-inja/go-blog/router"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// connect database
-	databaseAddress := ""
-	if os.Getenv("DATABASE_ADDRESS") != "" {
-		databaseAddress = os.Getenv("DATABASE_ADDRESS")
-	}
-	err := utils.Open(os.Getenv("DATABASE_USERNAME"), os.Getenv("DATABASE_PASSWORD"), databaseAddress, os.Getenv("DATABASE_NAME"))
+	err := utils.Init()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer utils.Close()
+	// defer utils.Close()
 
 	r := gin.Default()
 	r.GET("go-blog/api/v1/users", router.GetAllUsers)

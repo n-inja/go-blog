@@ -144,6 +144,9 @@ func UpdateProject(c *gin.Context) {
 	if body.NewDescription != "" {
 		project.Description = body.NewDescription
 	}
+	if body.NewDisplayName != "" {
+		project.DisplayName = body.NewDisplayName
+	}
 	err = project.Update(invites, removes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{})

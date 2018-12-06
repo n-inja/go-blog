@@ -31,7 +31,7 @@ func (post *Post) Insert() error {
 			fmt.Println("a")
 			return err
 		}
-		_, err = tx.Exec("insert into posts (id, title, content, thumb_src, user_id, number, created_at, updated_at, project_id, views, is_deleted) value(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", post.ID, post.Title, post.Content, post.ThumbSrc, post.UserID, post.Number, post.CreatedAt, post.UpdatedAt, post.ProjectID, post.Views, false)
+		_, err = tx.Exec("insert into posts (id, title, content, thumb_src, user_id, number, project_id, views, is_deleted) value(?, ?, ?, ?, ?, ?, ?, ?, ?)", post.ID, post.Title, post.Content, post.ThumbSrc, post.UserID, post.Number, post.ProjectID, post.Views, false)
 		fmt.Println("b")
 		return err
 	})
@@ -53,7 +53,7 @@ func (post *Post) Delete() error {
 func (post *Post) Update() error {
 	utils.Open()
 
-	_, err := utils.DB.Exec("update posts set title = ?, content = ?, thumb_src = ?, created_at = ?, updated_at = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.CreatedAt, post.UpdatedAt, post.ID)
+	_, err := utils.DB.Exec("update posts set title = ?, content = ?, thumb_src = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.ID)
 	return err
 }
 

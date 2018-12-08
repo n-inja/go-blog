@@ -156,3 +156,22 @@ func GetProject(ID string) (Project, error) {
 
 	return project, nil
 }
+
+func GetProjectByName(projectName string) (Project, error) {
+	utils.Open()
+
+	var projectID string
+	err := utils.DB.QueryRow("select id from projects where name = ?", projectName).Scan(&projectID)
+	if err != nil {
+		return Project{}, err
+	}
+
+	var project Project
+	err = utils.DB.QueryRow("select id, name, description from projects where name = ?", projectName).Scan(&project.ID, &project.Name, &project.Description)
+
+	if err != nil {
+		return Project{}, err
+	}
+
+	return project, nil
+}

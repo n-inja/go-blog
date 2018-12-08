@@ -20,6 +20,23 @@ func main() {
 	// defer utils.Close()
 
 	r := gin.Default()
+
+	router.LoadTMPL(r)
+
+	r.GET("blog/", router.SetTop)
+
+	r.GET("blog/users", router.SetUsers)
+	r.GET("blog/projects", router.SetProjects)
+	r.GET("blog/mypage", router.SetMyPage)
+
+	r.GET("blog/users/:userID", router.SetUser)
+	r.GET("blog/projects/:projectName", router.SetProject)
+
+	r.GET("blog/projects/:projectName/:postID/:number", router.SetPost)
+	r.GET("blog/projects/:projectName/:postID", router.SetPost)
+
+	r.Static("blog/static", os.Getenv("BLOG_STATIC_FILE_PATH")+"/static")
+
 	r.GET("go-blog/api/v1/users", router.GetAllUsers)
 	r.GET("go-blog/api/v1/users/:userID", router.GetUser)
 	r.PUT("go-blog/api/v1/profile", router.UpdateProfile)

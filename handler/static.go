@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"net/http"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/n-inja/go-blog/model"
-	"github.com/n-inja/go-blog/utils"
 )
 
 var hostname string
@@ -31,8 +30,6 @@ func returnNotFound(c *gin.Context) {
 }
 
 func LoadTMPL(e *gin.Engine) {
-	utils.Open()
-
 	hostname = os.Getenv("HOSTNAME")
 
 	e.LoadHTMLGlob(os.Getenv("BLOG_STATIC_FILE_PATH") + "/*.tmpl")

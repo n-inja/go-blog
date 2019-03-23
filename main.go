@@ -1,65 +1,55 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"./utils"
-	"github.com/n-inja/go-blog/router"
+	"github.com/n-inja/go-blog/handler"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// connect database
-	err := utils.Init()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	// defer utils.Close()
-
 	r := gin.Default()
 
-	router.LoadTMPL(r)
+	handler.LoadTMPL(r)
 
-	r.GET("blog/", router.SetTop)
+	r.GET("blog/", handler.SetTop)
 
-	r.GET("blog/users", router.SetUsers)
-	r.GET("blog/projects", router.SetProjects)
-	r.GET("blog/mypage", router.SetMyPage)
+	r.GET("blog/users", handler.SetUsers)
+	r.GET("blog/projects", handler.SetProjects)
+	r.GET("blog/mypage", handler.SetMyPage)
 
-	r.GET("blog/users/:userID", router.SetUser)
-	r.GET("blog/projects/:projectName", router.SetProject)
+	r.GET("blog/users/:userID", handler.SetUser)
+	r.GET("blog/projects/:projectName", handler.SetProject)
 
-	r.GET("blog/projects/:projectName/:postID/:number", router.SetPost)
-	r.GET("blog/projects/:projectName/:postID", router.SetPost)
+	r.GET("blog/projects/:projectName/:postID/:number", handler.SetPost)
+	r.GET("blog/projects/:projectName/:postID", handler.SetPost)
 
 	r.Static("blog/static", os.Getenv("BLOG_STATIC_FILE_PATH")+"/static")
 
-	r.GET("go-blog/api/v1/users", router.GetAllUsers)
-	r.GET("go-blog/api/v1/users/:userID", router.GetUser)
-	r.PUT("go-blog/api/v1/profile", router.UpdateProfile)
+	r.GET("go-blog/api/v1/users", handler.GetAllUsers)
+	r.GET("go-blog/api/v1/users/:userID", handler.GetUser)
+	r.PUT("go-blog/api/v1/profile", handler.UpdateProfile)
 
-	r.GET("go-blog/api/v1/projects", router.GetProjects)
-	r.GET("go-blog/api/v1/projects/:projectID", router.GetProject)
-	r.POST("go-blog/api/v1/projects", router.PostProject)
-	r.DELETE("go-blog/api/v1/projects/:projectID", router.DeleteProject)
-	r.PUT("go-blog/api/v1/projects/:projectID", router.UpdateProject)
+	r.GET("go-blog/api/v1/projects", handler.GetProjects)
+	r.GET("go-blog/api/v1/projects/:projectID", handler.GetProject)
+	r.POST("go-blog/api/v1/projects", handler.PostProject)
+	r.DELETE("go-blog/api/v1/projects/:projectID", handler.DeleteProject)
+	r.PUT("go-blog/api/v1/projects/:projectID", handler.UpdateProject)
 
-	r.GET("go-blog/api/v1/users/:userID/posts", router.GetUserPosts)
-	r.GET("go-blog/api/v1/projects/:projectID/posts", router.GetProjectPosts)
-	r.GET("go-blog/api/v1/posts", router.GetPosts)
-	r.GET("go-blog/api/v1/posts/:postID", router.GetPost)
-	r.GET("go-blog/api/v1/projects/:projectID/post", router.GetProjectPostById)
-	r.POST("go-blog/api/v1/projects/:projectID/posts", router.PostPost)
-	r.DELETE("go-blog/api/v1/posts/:postID", router.DeletePost)
-	r.PUT("go-blog/api/v1/posts/:postID", router.UpdatePost)
+	r.GET("go-blog/api/v1/users/:userID/posts", handler.GetUserPosts)
+	r.GET("go-blog/api/v1/projects/:projectID/posts", handler.GetProjectPosts)
+	r.GET("go-blog/api/v1/posts", handler.GetPosts)
+	r.GET("go-blog/api/v1/posts/:postID", handler.GetPost)
+	r.GET("go-blog/api/v1/projects/:projectID/post", handler.GetProjectPostById)
+	r.POST("go-blog/api/v1/projects/:projectID/posts", handler.PostPost)
+	r.DELETE("go-blog/api/v1/posts/:postID", handler.DeletePost)
+	r.PUT("go-blog/api/v1/posts/:postID", handler.UpdatePost)
 
-	r.GET("go-blog/api/v1/posts/:postID/comments", router.GetPostComments)
-	r.GET("go-blog/api/v1/comments/:commentID", router.GetComment)
-	r.POST("go-blog/api/v1/posts/:postID/comments", router.PostComment)
-	r.DELETE("go-blog/api/v1/comments/:commentID", router.DeleteComment)
+	r.GET("go-blog/api/v1/posts/:postID/comments", handler.GetPostComments)
+	r.GET("go-blog/api/v1/comments/:commentID", handler.GetComment)
+	r.POST("go-blog/api/v1/posts/:postID/comments", handler.PostComment)
+	r.DELETE("go-blog/api/v1/comments/:commentID", handler.DeleteComment)
 
 	r.Run(":" + os.Getenv("GO_BLOG_PORT"))
 }

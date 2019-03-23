@@ -23,8 +23,6 @@ type Post struct {
 }
 
 func (post *Post) Insert() error {
-	utils.Open()
-
 	return utils.Transact(func(tx *sql.Tx) error {
 		err := tx.QueryRow("select count(*) from posts where project_id = ?", post.ProjectID).Scan(&post.Number)
 		if err != nil {
@@ -38,8 +36,6 @@ func (post *Post) Insert() error {
 }
 
 func (post *Post) Delete() error {
-	utils.Open()
-
 	return utils.Transact(func(tx *sql.Tx) error {
 		_, err := tx.Exec("update posts set is_deleted = true where id = ?", post.ID)
 		if err != nil {
@@ -51,15 +47,11 @@ func (post *Post) Delete() error {
 }
 
 func (post *Post) Update() error {
-	utils.Open()
-
 	_, err := utils.DB.Exec("update posts set title = ?, content = ?, thumb_src = ? where id = ?", post.Title, post.Content, post.ThumbSrc, post.ID)
 	return err
 }
 
 func GetUserPosts(userID string, offset, limit int) ([]Post, error) {
-	utils.Open()
-
 	rows, err := utils.DB.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.number, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where user_id = ? and is_deleted = false order by created_at desc limit ?, ?) posts left join comments on comments.post_id = posts.id group by posts.id", userID, offset, limit)
 	if err != nil {
 		return make([]Post, 0), err
@@ -80,8 +72,6 @@ func GetUserPosts(userID string, offset, limit int) ([]Post, error) {
 }
 
 func GetProjectPosts(projectID string, offset, limit int) ([]Post, error) {
-	utils.Open()
-
 	rows, err := utils.DB.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.number, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where project_id = ? and is_deleted = false order by created_at desc limit ?, ?) posts left join comments on comments.post_id = posts.id group by posts.id", projectID, offset, limit)
 	if err != nil {
 		return make([]Post, 0), err
@@ -102,8 +92,6 @@ func GetProjectPosts(projectID string, offset, limit int) ([]Post, error) {
 }
 
 func GetPosts(offset, limit int) ([]Post, error) {
-	utils.Open()
-
 	rows, err := utils.DB.Query("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.number, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where is_deleted = false order by created_at desc limit ?, ?) posts left join comments on comments.post_id = posts.id group by posts.id", offset, limit)
 	if err != nil {
 		return make([]Post, 0), err
@@ -124,8 +112,6 @@ func GetPosts(offset, limit int) ([]Post, error) {
 }
 
 func GetPost(postID string) (Post, error) {
-	utils.Open()
-
 	var post Post
 	var thumbSrc sql.NullString
 	err := utils.DB.QueryRow("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.number, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where id = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", postID).Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.Number, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)
@@ -141,8 +127,6 @@ func GetPost(postID string) (Post, error) {
 }
 
 func GetProjectPostById(projectID string, postNumber int) (Post, error) {
-	utils.Open()
-
 	var post Post
 	var thumbSrc sql.NullString
 	err := utils.DB.QueryRow("select posts.id, title, posts.content, thumb_src, posts.user_id, posts.number, posts.created_at, updated_at, project_id, views, count(comments.id) from (select * from posts where project_id = ? and number = ? and is_deleted = false) posts left join comments on posts.id = comments.post_id group by posts.id", projectID, postNumber).Scan(&post.ID, &post.Title, &post.Content, &thumbSrc, &post.UserID, &post.Number, &post.CreatedAt, &post.UpdatedAt, &post.ProjectID, &post.Views, &post.CommentNum)

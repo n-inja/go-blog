@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -11,6 +14,33 @@ import (
 )
 
 var hostname string
+var fileMap map[string][]byte
+
+func init() {
+	fileMap = make(map[string][]byte, 8)
+	js := filepath.Join(os.Getenv("BLOG_STATIC_FILE_PATH"), "static", "js")
+	css := filepath.Join(os.Getenv("BLOG_STATIC_FILE_PATH"), "static", "css")
+	files, err := ioutil.ReadDir(js)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		fileMap[filepath.Join("js", f.Name())], err = ioutil.ReadFile(filepath.Join(js, f.Name()))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	files, err = ioutil.ReadDir(css)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		fileMap[filepath.Join("css", f.Name())], err = ioutil.ReadFile(filepath.Join(css, f.Name()))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
 
 func summarize(content string) string {
 	length := len(content)
@@ -154,4 +184,32 @@ func SetPost(c *gin.Context) {
 		"description": summarize(post.Content),
 		"imageURL":    imageURL,
 	})
+}
+
+func ServeStatic(c *gin.Context) {
+	path := filepath.Join(c.Param("directory"), c.Param("filename"))
+	mime := ""
+	if filepath.Ext(path) == ".js" {
+		mime = "application/javascript"
+	} else if filepath.Ext(path) == ".css" {
+		mime = "text/css"
+	}
+
+	if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
+		path += ".gz"
+		c.Header("Content-Encoding", "gzip")
+	}
+
+	c.Header("Cache-Control", "public, max-age=604800")
+
+	var bytes []byte
+	var ok bool
+	bytes, ok = fileMap[path]
+
+	if !ok {
+		c.String(http.StatusNotFound, "", gin.H{})
+		return
+	}
+
+	c.Data(http.StatusOK, mime, bytes)
 }

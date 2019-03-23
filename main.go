@@ -25,7 +25,7 @@ func main() {
 	r.GET("blog/projects/:projectName/:postID/:number", handler.SetPost)
 	r.GET("blog/projects/:projectName/:postID", handler.SetPost)
 
-	r.Static("blog/static", os.Getenv("BLOG_STATIC_FILE_PATH")+"/static")
+	r.GET("blog/static/:directory/:filename", handler.ServeStatic)
 
 	r.GET("go-blog/api/v1/users", handler.GetAllUsers)
 	r.GET("go-blog/api/v1/users/:userID", handler.GetUser)
